@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo and Video Album</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+        body {
+            margin: 0;
+        }
+
+        .site {
+            margin: 10px;
+        }
+        
+        header {
+            background-color: #ff6f61;
+            color: white;
+            padding: 1em;
+            text-align: center;
+        }
+        #mediaContainer {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 10px;
+            width: 100%;
+        }
+        .media-container {
+            position: relative;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+            height: 200px;
+        }
+        .media-container:hover {
+            transform: scale(1.05);
+        }
+        .media {
+            width: 100%;
+            cursor: pointer;
+            object-fit: cover;
+            height: inherit;
+        }
+        .fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .fullscreen img, .fullscreen video {
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0px 0px 15px 0px rgba(255,255,255, 0.5);
+            border-radius: 10px;
+        }
+
+        #fullscreenImage {
+            max-height: 80vh;
+        }
+
+        .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            pointer-events: none;
+            filter: drop-shadow(0 0 0.75rem white) invert(1);
+        }
+
+        .info-box {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            box-sizing: border-box;
+            display: none;
+            pointer-events: none;
+        }
+
+        .media-container:hover .info-box {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Valentime</h1>
+    </header>
+
+    <div class="site">
+
+        <div id="mediaContainer"></div>
+
+        <div id="fullscreenContainer" class="fullscreen" style="display: none;">
+            <img id="fullscreenImage" src="" alt="Fullscreen Image" style="display: none;">
+            <video id="fullscreenVideo" controls style="display: none;"></video>
+        </div>
+
+        <div>
+            <h2>Upload Media</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+            <label for="mediaType">Media Type:</label>
+            <select id="mediaType" name="mediaType" required>
+                <option value="photo">Photo</option>
+                <option value="video">Video</option>
+            </select>
+            <br><br>
+            <label for="mediaFile">Choose file:</label>
+            <input type="file" id="mediaFile" name="mediaFile" accept="image/*,video/*" required>
+            <br><br>
+            <label for="mediaName">Name:</label>
+            <input type="text" id="mediaName" name="mediaName" required>
+            <br><br>
+            <label for="uploadedBy">Uploaded by:</label>
+            <input type="text" id="uploadedBy" name="uploadedBy" required>
+            <br><br>
+            <button type="submit">Upload</button>
+            </form>
+        </div>
+
+        <script>
+            const uploadForm = document.getElementById('uploadForm');
+
+            uploadForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const formData = new FormData(uploadForm);
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                alert('Media uploaded successfully!');
+                location.reload();
+                } else {
+                alert('Failed to upload media.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while uploading the media.');
+            });
+            });
+        </script>
+    </div>
+
+    <script>
+        const mediaContainer = document.getElementById('mediaContainer');
+        const fullscreenContainer = document.getElementById('fullscreenContainer');
+        const fullscreenImage = document.getElementById('fullscreenImage');
+        const fullscreenVideo = document.getElementById('fullscreenVideo');
+
+        function createMediaWrapper(item) {
+            console.log("Item:",item)
+            const mediaWrapper = document.createElement('div');
+            mediaWrapper.classList.add('media-container');
+            
+            let mediaElement;
+            if (item.type === 'photo') {
+                // create image element
+                mediaElement = document.createElement('img');
+                mediaElement.src = item.url;
+                mediaElement.alt = item.name;
+                mediaElement.setAttribute("onerror","if (this.src != 'error.jpg') this.src = '/assets/images/error.jpg';");
+                // Append to the parent
+                mediaElement.classList.add('media');
+                mediaWrapper.appendChild(mediaElement);
+                mediaContainer.appendChild(mediaWrapper);
+            } else if (item.type === 'video') {
+                // create video element
+                mediaElement = document.createElement('video');
+                mediaElement.src = `${item.url}#t=0.1`;
+                mediaElement.setAttribute("preload","metadata");
+
+                // create play icon
+                let playIcon = document.createElement("img");
+                playIcon.src = `/assets/images/icon_play_video.png`;
+                playIcon.classList.add('play-icon');
+
+                // Append to the parent
+                mediaElement.classList.add('media');
+                mediaWrapper.appendChild(mediaElement);
+                mediaWrapper.appendChild(playIcon);
+                mediaContainer.appendChild(mediaWrapper);
+            }
+
+            // create info box
+            const infoBox = document.createElement('div');
+            infoBox.classList.add('info-box');
+            infoBox.innerHTML = `<strong>${item.name}</strong><br>Uploaded by: ${item.uploadedBy}<br>Upload date: ${item.uploadDate}`;
+            mediaWrapper.appendChild(infoBox);
+
+            return mediaElement;
+        }
+
+        fetch('/api/album')
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(item => {
+                    let mediaElement = createMediaWrapper(item);
+
+                    mediaElement.addEventListener('click', () => {
+                        if (item.type === 'photo') {
+                            fullscreenImage.src = item.url;
+                            fullscreenImage.alt = item.name;
+                            fullscreenImage.style.display = 'block';
+                            fullscreenVideo.style.display = 'none';
+                        } else if (item.type === 'video') {
+                            fullscreenVideo.src = item.url;
+                            fullscreenVideo.style.display = 'block';
+                            fullscreenImage.style.display = 'none';
+                            fullscreenVideo.play();
+                        }
+                        fullscreenContainer.style.display = 'flex';
+                    });
+                });
+            });
+
+        fullscreenContainer.addEventListener('click', () => {
+            fullscreenContainer.style.display = 'none';
+            fullscreenVideo.pause();
+        });
+    </script>
+</body>
+</html>

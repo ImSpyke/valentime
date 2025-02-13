@@ -1,12 +1,186 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"></html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Index Page</title>
+    <title>Valentime</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #ff6f61;
+            color: white;
+            padding: 1em;
+            text-align: center;
+        }
+        section {
+            margin: 2em;
+            padding: 1em;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: #ff6f61;
+        }
+        .photo-album img {
+            width: 100px;
+            height: 100px;
+            margin: 5px;
+            border-radius: 8px;
+        }
+        .calendar, .memory-book, .wishlist {
+            margin-top: 1em;
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome to My Simple Index Page</h1>
-    <p>This is a basic HTML page.</p>
+    <header>
+        <h1>Valentime</h1>
+    </header>
+    <section>
+        <h2>Love Days Counter</h2>
+        <p id="first-chat-counter"></p>
+        <p id="first-meet-counter"></p>
+        <p id="in-couple-counter"></p>
+    </section>
+    <section class="photo-album">
+        <h2>Interactive Photo Album</h2>
+        <a href="/album">Go see the album</a>
+    </section>
+    <section class="calendar">
+        <h2>Special Moments Calendar</h2>
+        <p>Coming soon...</p>
+        <ul id="special-dates"></ul>
+    </section>
+    <section class="memory-book">
+        <h2>Virtual Memory Book</h2>
+        <p>coming soon...</p>
+        <!--
+        <textarea id="memory-text" rows="4" cols="50" placeholder="Write your memories here..."></textarea>
+        <button onclick="addMemory()">Add to Memory Book</button>
+        <div id="memory-book"></div>-->
+    </section>
+    <section class="wishlist">
+        <h2>Shared Wishlist</h2>
+        <p>A place where we both can add wishes, gift ideas, places to visit together, etc.</p>
+        <p>Coming soon...</p>
+        <!--
+        <input type="text" id="wish-input" placeholder="Add a wish">
+        <button onclick="addWish()">Add</button>
+        <ul id="wishlist"></ul>-->
+    </section>
+    <script>
+        // Love Days Counter
+        const firstChatDate = new Date('2023-11-02'); // Change this to your first chat date
+        const firstMeetDate = new Date('2023-12-27'); // Change this to your first meet date
+        const inCoupleDate = new Date('2024-03-09'); // Change this to your in couple date
+
+        const today = new Date();
+
+        function calculateDays(date) {
+            const diffTime = Math.abs(today - date);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        
+
+        function formatTime(millisecondes, format) {
+            /*
+            Renvoie un dictionnaire avec le formatage de la durée en ms, en jour, heures, etc...
+            YYYY: year
+            MM: month
+            DDDDD: jour de l'année
+            DD: jours du mois
+            hh: heure
+            mm: minute
+            ss: seconde
+            */
+            let v = {
+                y: 31536000000,
+                mo: 2628000000,
+                d: 86400000,
+                h: 3600000,
+                m: 60000,
+                s: 1000
+            };
+            let la_date = {
+                years: Math.floor(millisecondes / v.y),
+                months: Math.floor((millisecondes % v.y) / v.mo), // value de l'année divisée en douze poue faire à peu pres
+                all_days: Math.floor(millisecondes / v.d), // jours de l'année
+                days: Math.floor(((millisecondes % v.y) % v.mo) / v.d), // jours du mois
+                hours: Math.floor((((millisecondes % v.y) % v.mo) % v.d) / v.h),
+                minutes: Math.floor(((((millisecondes % v.y) % v.mo) % v.d) % v.h) / v.m),
+                seconds: Math.floor((((((millisecondes % v.y) % v.mo) % v.d) % v.h) % v.m) / v.s),
+                milliseconds: (((((millisecondes % v.y) % v.mo) % v.d) % v.h) % v.m) % v.s
+            };
+            //console.log(la_date)
+            function formatThis(thing, length = 2) {
+                return `0000${thing}`.substr(-length);
+            }
+            let return_string = format
+                .replace("YYYY", `${la_date.years}`)
+                .replace("MM", formatThis(`${la_date.months}`))
+                .replace("DDDDD", `${la_date.all_days}`)
+                .replace("DD", formatThis(`${la_date.days}`))
+                .replace("hh", formatThis(`${la_date.hours}`))
+                .replace("mm", formatThis(`${la_date.minutes}`))
+                .replace("ss", `${la_date.seconds}`)
+                .replace("ms", formatThis(`${la_date.milliseconds}`, 3));
+            return return_string;
+        }
+
+        document.getElementById('first-chat-counter').innerText = `First chat together: ${calculateDays(firstChatDate)} days ago (${formatTime(Math.abs(today - firstChatDate), "YYYY years, MM months, DD days")})`
+        document.getElementById('first-meet-counter').innerText = `First time seeing each other: ${calculateDays(firstMeetDate)} days ago (${formatTime(Math.abs(today - firstMeetDate), "YYYY years, MM months, DD days")})`
+        document.getElementById('in-couple-counter').innerText = `Together since: ${calculateDays(inCoupleDate)} days ago (${formatTime(Math.abs(today - inCoupleDate), "YYYY years, MM months, DD days")})`
+
+        // Interactive Photo Album
+        document.getElementById('photo-upload').addEventListener('change', function(event) {
+            const files = event.target.files;
+            const gallery = document.getElementById('photo-gallery');
+            gallery.innerHTML = '';
+            for (let i = 0; i < files.length; i++) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(files[i]);
+                gallery.appendChild(img);
+            }
+        });
+
+        // Special Moments Calendar
+        const specialDates = ['2023-12-25', '2024-01-01']; // Add your special dates here
+        const specialDatesList = document.getElementById('special-dates');
+        specialDates.forEach(date => {
+            const li = document.createElement('li');
+            li.innerText = date;
+            specialDatesList.appendChild(li);
+        });
+
+        // Virtual Memory Book
+        function addMemory() {
+            const memoryText = document.getElementById('memory-text').value;
+            const memoryBook = document.getElementById('memory-book');
+            const p = document.createElement('p');
+            p.innerText = memoryText;
+            memoryBook.appendChild(p);
+            document.getElementById('memory-text').value = '';
+        }
+
+        // Shared Wishlist
+        function addWish() {
+            const wishInput = document.getElementById('wish-input').value;
+            const wishlist = document.getElementById('wishlist');
+            const li = document.createElement('li');
+            li.innerText = wishInput;
+            wishlist.appendChild(li);
+            document.getElementById('wish-input').value = '';
+        }
+    </script>
 </body>
 </html>
