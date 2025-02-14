@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { execFile } from 'child_process';
 import { path as ffprobe_path } from 'ffprobe-static';
+import multer from 'multer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+
+// create public/album and public/datas if not exist
+const publicAlbumPath = path.join(__dirname, '../public/assets/album');
+const publicDatasPath = path.join(__dirname, '../public/assets/datas');
+
+if (!fs.existsSync(publicAlbumPath)) {
+    fs.mkdirSync(publicAlbumPath, { recursive: true });
+}
+
+if (!fs.existsSync(publicDatasPath)) {
+    fs.mkdirSync(publicDatasPath, { recursive: true });
+}
+
 
 function getVideoDuration(filePath:string) {
     return new Promise((resolve, reject) => {
@@ -25,66 +40,86 @@ function getVideoDuration(filePath:string) {
 }
 
 
-/*
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-
-const app = express();
-const port = 3000;
-
-// Définir le stockage des fichiers
 const storage = multer.diskStorage({
-destination: (req, file, cb) => {
-cb(null, 'uploads/'); // Dossier où stocker les fichiers
-},
-filename: (req, file, cb) => {
-const ext = path.extname(file.originalname);
-const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${ext}`;
-cb(null, uniqueName);
-}
+    destination: (_req, _file, cb) => {
+        cb(null, 'public/assets/album/'); // Dossier où stocker les fichiers
+    },
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const mediaName = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+        cb(null, `${mediaName}${ext}`);
+    }
 });
 
 const upload = multer({ storage });
 
-// Endpoint d'upload
-app.post('/api/upload', upload.single('mediaFile'), (req, res) => {
-if (!req.file) {
-return res.status(400).json({ success: false, message: 'No file uploaded' });
-}
+app.post('/api/upload', upload.single('mediaFile'), (req, res): void => {
+    if (!req.file) {
+        res.status(400).json({ success: false, message: 'No file uploaded' });
+        return;
+    }
 
-// Récupération des autres données du formulaire
-const { mediaType, mediaName, uploadedBy } = req.body;
+    
+    
 
-res.json({
-success: true,
-message: 'File uploaded successfully',
-file: {
-    originalName: req.file.originalname,
-    storedName: req.file.filename,
-    path: req.file.path,
-    mediaType,
-    mediaName,
-    uploadedBy
-}
+    // Récupération des autres données du formulaire
+    const { mediaType, mediaName, uploadedBy } = req.body;
+
+    const datas = {
+        originalName: req.file.originalname,
+        storedName: req.file.filename,
+        path: req.file.path,
+        mediaType,
+        mediaName,
+        uploadedAt: Date.now(),
+        uploadedBy
+    }
+    console.log('File info:',datas)
+    
+    res.json({
+        success: true,
+        message: 'File uploaded successfully',
+        file: datas
+    });
+    const metaDataPath = path.join(__dirname, '../public/assets/datas/metadata.json');
+    let metaDatas: any = { items: [] };
+
+    if (fs.existsSync(metaDataPath) && fs.statSync(metaDataPath).isFile()) {
+        metaDatas = JSON.parse(fs.readFileSync(metaDataPath, 'utf-8'));
+    }
+
+    metaDatas.items.push(datas)
+    /*{
+        storedName: datas.storedName,
+        fileName: req.file.filename,
+        uploadBy: uploadedBy,
+        uploadAt: Date.now()
+    });*/
+
+    fs.writeFileSync(metaDataPath, JSON.stringify(metaDatas, null, 2), 'utf-8');
+    return;
 });
-});
-
-// Démarrer le serveur
-app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
-*/
 
 app.get("/api/album", async(_req,res) => {
 
     // Get album metadatas
     let metaDatas: {
         items: Array<{
-            fileName: string,
-            uploadBy: string,
-            uploadAt: number,
-
+            originalName: string,
+            storedName: string
+            path: string,
+            mediaType: "image" | "video",
+            mediaName: string
+            uploadedAt: number,
+            uploadedBy: string
+    
         }>
-    } = JSON.parse(fs.readFileSync(path.join(__dirname, '../public', "./assets/album"), 'utf-8'));
+    } = { items: [] };
+    
+    const metaDataPath = path.join(__dirname, '../public', "./assets/datas/metadata.json");
+    if (fs.existsSync(metaDataPath) && fs.statSync(metaDataPath).isFile()) {
+        metaDatas = JSON.parse(fs.readFileSync(metaDataPath, 'utf-8'));
+    }
     
 
     const albumPath = path.join(__dirname, '../public', "./assets/album");
@@ -93,8 +128,7 @@ app.get("/api/album", async(_req,res) => {
             console.log(`[/api/album] Error:`,err)
             res.status(500).send('Error reading album directory');
             return;
-        }
-        
+        }        
 
         const album = files.map(async file => {
             const filePath = path.join(albumPath, file);
@@ -102,12 +136,14 @@ app.get("/api/album", async(_req,res) => {
             const ext = path.extname(file).toLowerCase();
             const type = ext === '.mp4' || ext === '.mov' ? 'video' : 'photo';
 
+            const metaData = metaDatas.items.find(item => item.storedName === file);
+
             return {
                 type: type,
                 url: `/assets/album/${file}`,
-                uploadBy: 'unknown', // Placeholder, replace with actual logic if available
-                uploadAt: stats.mtimeMs,
-                name: file,
+                uploadedBy: metaData?.uploadedBy ?? "Unknown", // Placeholder, replace with actual logic if available
+                uploadedAt: stats.mtimeMs,
+                name: metaData?.mediaName,
                 duration: type === 'video' ? await getVideoDuration(filePath) : null
             };
         });

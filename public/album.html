@@ -97,6 +97,31 @@
         .media-container:hover .info-box {
             display: block;
         }
+
+        #mediaName.invalid {
+            border: 2px solid red;
+            outline: none;
+        }
+        #mediaName:focus-visible.invalid { border: 2px solid red; }
+
+        .btn-default {
+            background-color: #ff6f61;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn-default:hover {
+            background-color: #e65c50;
+        }
     </style>
 </head>
 <body>
@@ -116,14 +141,9 @@
         <div>
             <h2>Upload Media</h2>
             <form id="uploadForm" enctype="multipart/form-data">
-            <label for="mediaType">Media Type:</label>
-            <select id="mediaType" name="mediaType" required>
-                <option value="photo">Photo</option>
-                <option value="video">Video</option>
-            </select>
-            <br><br>
             <label for="mediaFile">Choose file:</label>
-            <input type="file" id="mediaFile" name="mediaFile" accept="image/*,video/*" required>
+            <input type="file" id="mediaFile" class="btn-default" name="mediaFile" accept="image/*,video/*" required>
+            <input id="mediaType" name="mediaType" hidden>
             <br><br>
             <label for="mediaName">Name:</label>
             <input type="text" id="mediaName" name="mediaName" required>
@@ -131,35 +151,113 @@
             <label for="uploadedBy">Uploaded by:</label>
             <input type="text" id="uploadedBy" name="uploadedBy" required>
             <br><br>
-            <button type="submit">Upload</button>
+            <button type="submit" class="btn-default">Upload</button>
             </form>
         </div>
 
         <script>
             const uploadForm = document.getElementById('uploadForm');
+            const mediaFileInput = document.getElementById('mediaFile');
+
+            function formatDate(timestamp, format) {
+                /*
+                YYYY: year
+                MM: month
+                DDDDD: jour de la semaine
+                DD: day
+                hh: heure
+                mm: minute
+                ss: seconde
+                ms: miliseconds
+                */
+                let la_date = new Date(timestamp);
+                function formatThis(thing, length = 2) {
+                    let temp = `0000${thing}`;
+                    return temp.substring(temp.length - length, temp.length);
+                }
+                function getDayName() {
+                    let list = [
+                        "lundi",
+                        "mardi",
+                        "mercredi",
+                        "jeudi",
+                        "vendredi",
+                        "samedi",
+                        "dimanche"
+                    ];
+                    return list[la_date.getDay() - 1];
+                }
+                let return_string = format
+                    .replace("YYYY", `${la_date.getFullYear()}`)
+                    .replace("MM", formatThis(`${la_date.getMonth() + 1}`))
+                    .replace("DDDDD", getDayName())
+                    .replace("DD", formatThis(`${la_date.getDate()}`))
+                    .replace("hh", formatThis(`${la_date.getHours()}`))
+                    .replace("mm", formatThis(`${la_date.getMinutes()}`))
+                    .replace("ss", formatThis(`${la_date.getSeconds()}`))
+                    .replace("ms", formatThis(`${la_date.getMilliseconds()}`, 3));
+                return return_string;
+            }
+
+            mediaFileInput.addEventListener('change', function() {
+                const file = mediaFileInput.files[0];
+                if (file) {
+                    document.getElementById('mediaName').value = file.name;
+                }
+            });
+
+
+            const mediaName_regex = /^([a-zA-Z0-9_\- ]+)\.([a-zA-Z0-9]{1,5})$/
+
+            const mediaNameInput = document.getElementById('mediaName');
+            mediaNameInput.addEventListener('input', function() {
+                if (!mediaName_regex.test(mediaNameInput.value)) {
+                    mediaNameInput.classList.add("invalid")
+                } else {
+                    mediaNameInput.classList.remove("invalid")
+                }
+            });
 
             uploadForm.addEventListener('submit', function(event) {
-            event.preventDefault();
+                event.preventDefault();
 
-            const formData = new FormData(uploadForm);
-
-            fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                alert('Media uploaded successfully!');
-                location.reload();
-                } else {
-                alert('Failed to upload media.');
+                if (!mediaName_regex.test(mediaNameInput.value)) {
+                    alert(`Invalid name provided`)
+                    return;
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while uploading the media.');
-            });
+                const file = mediaFileInput.files[0];
+                if (!file) {
+                    alert('Please select a file to upload.');
+                    return;
+                }
+
+                const fileType = file.type.split('/')[0];
+                if (fileType !== 'image' && fileType !== 'video') {
+                    alert('Invalid file type. Please upload an image or video.');
+                    return;
+                }
+
+                document.getElementById("mediaType").value = fileType
+
+                const formData = new FormData(uploadForm);
+
+                fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Media uploaded successfully!');
+                        location.reload();
+                    } else {
+                        alert('Failed to upload media.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while uploading the media.');
+                });
             });
         </script>
     </div>
@@ -207,7 +305,7 @@
             // create info box
             const infoBox = document.createElement('div');
             infoBox.classList.add('info-box');
-            infoBox.innerHTML = `<strong>${item.name}</strong><br>Uploaded by: ${item.uploadedBy}<br>Upload date: ${item.uploadDate}`;
+            infoBox.innerHTML = `<strong>${item.name}</strong><br>Uploaded by: ${item.uploadedBy}<br>Upload date: ${(new Date(item.uploadedAt)).toGMTString()}`;
             mediaWrapper.appendChild(infoBox);
 
             return mediaElement;
