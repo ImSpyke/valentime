@@ -7,6 +7,9 @@ import fs from 'fs';
 import { execFile } from 'child_process';
 import { path as ffprobe_path } from 'ffprobe-static';
 import multer from 'multer';
+import dotenv from 'dotenv'
+import * as SF from 'somefunctions'
+dotenv.config()
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +17,24 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+import cookieParser from 'cookie-parser';
+app.use(cookieParser());
+
+import * as Types from './types.js'
+
+
+
+app.use((req, res, next) => {
+    const token = req.cookies?.token;
+    const sanitized_token = (req.cookies != null && typeof req.cookies?.token === 'string') ? `${req.cookies?.token ?? "---------"}` : "------"
+    console.log(`[app.use] Cookies:`,req.cookies)
+    if (SF.isBufferEqual(Buffer.from(<string>process.env.TOKEN), Buffer.from(sanitized_token)) == false) {
+        res.status(404).send('Not found');
+        return;
+    }
+    next();
+});
 
 
 // create public/album and public/datas if not exist
@@ -40,6 +61,8 @@ function getVideoDuration(filePath:string) {
 }
 
 
+
+
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => {
         cb(null, 'public/assets/album/'); // Dossier où stocker les fichiers
@@ -59,20 +82,17 @@ app.post('/api/upload', upload.single('mediaFile'), (req, res): void => {
         return;
     }
 
-    
-    
-
     // Récupération des autres données du formulaire
     const { mediaType, mediaName, uploadedBy } = req.body;
 
-    const datas = {
-        originalName: req.file.originalname,
-        storedName: req.file.filename,
-        path: req.file.path,
-        mediaType,
-        mediaName,
-        uploadedAt: Date.now(),
-        uploadedBy
+    const datas: Types.AlbumItem = {
+        originalName:   req.file.originalname,
+        storedName:     req.file.filename,
+        path:           req.file.path,
+        mediaType:      mediaType,
+        mediaName:      mediaName,
+        uploadedAt:     Date.now(),
+        uploadedBy:     uploadedBy
     }
     console.log('File info:',datas)
     
@@ -81,11 +101,15 @@ app.post('/api/upload', upload.single('mediaFile'), (req, res): void => {
         message: 'File uploaded successfully',
         file: datas
     });
-    const metaDataPath = path.join(__dirname, '../public/assets/datas/metadata.json');
+    const metaDataPath = path.join(__dirname, '../public/assets/datas/album.json');
     let metaDatas: any = { items: [] };
 
     if (fs.existsSync(metaDataPath) && fs.statSync(metaDataPath).isFile()) {
+        // If file exists, get the datas
         metaDatas = JSON.parse(fs.readFileSync(metaDataPath, 'utf-8'));
+    } else {
+        // If file doesn't exist, set to default datas
+        metaDatas = { items: [] }
     }
 
     metaDatas.items.push(datas)
@@ -96,25 +120,19 @@ app.post('/api/upload', upload.single('mediaFile'), (req, res): void => {
         uploadAt: Date.now()
     });*/
 
-    fs.writeFileSync(metaDataPath, JSON.stringify(metaDatas, null, 2), 'utf-8');
+    const text = JSON.stringify(metaDatas, null, 2)
+    fs.writeFileSync(metaDataPath, text, 'utf-8');
+    const date = (new Date()).toISOString().substring(0,4+1+2+1+2) // 2025-02-14
+    // Write a backup
+    fs.writeFileSync(path.join(__dirname, `../public/assets/backups/datas/${date}-album.json`), text);
     return;
 });
+
 
 app.get("/api/album", async(_req,res) => {
 
     // Get album metadatas
-    let metaDatas: {
-        items: Array<{
-            originalName: string,
-            storedName: string
-            path: string,
-            mediaType: "image" | "video",
-            mediaName: string
-            uploadedAt: number,
-            uploadedBy: string
-    
-        }>
-    } = { items: [] };
+    let metaDatas: Types.AlbumMetaDatas = { items: [] };
     
     const metaDataPath = path.join(__dirname, '../public', "./assets/datas/metadata.json");
     if (fs.existsSync(metaDataPath) && fs.statSync(metaDataPath).isFile()) {
