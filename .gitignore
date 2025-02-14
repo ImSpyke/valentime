@@ -132,3 +132,5 @@ dist
 
 # custom
 public/assets/album/*
+# Keep every .gitkeep files inany directories or subdirectories
+!*.gitkeep
