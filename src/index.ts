@@ -23,14 +23,27 @@ app.use(cookieParser());
 
 import * as Types from './types.js'
 
+const LOCAL_TOKEN = process.env?.TOKEN ?? null
 
+if(LOCAL_TOKEN == null || typeof LOCAL_TOKEN !='string' ) {
+    throw new Error()
+}
 
+console.log("Loaded token:",LOCAL_TOKEN)
 app.use((req, res, next) => {
-    const token = req.cookies?.token;
-    const sanitized_token = (req.cookies != null && typeof req.cookies?.token === 'string') ? `${req.cookies?.token ?? "---------"}` : "------"
-    console.log(`[app.use] Cookies:`,req.cookies)
-    if (SF.isBufferEqual(Buffer.from(<string>process.env.TOKEN), Buffer.from(sanitized_token)) == false) {
+
+    function noSiteError() {
         res.status(404).send('Not found');
+        return;
+    }
+    console.log("Client cookies:",req.query?.cookie)
+    const token = req.cookies?.token ?? null
+    const sanitized_token = (token != null && typeof token === 'string') ? `${token ?? null}` : null
+    console.log("LOCAL token:",LOCAL_TOKEN)
+    console.log("client token:",sanitized_token)
+    if(sanitized_token == null) { noSiteError(); return; }
+    if (SF.isBufferEqual(Buffer.from(<string>process.env.TOKEN), Buffer.from(sanitized_token)) == false) {
+        noSiteError()
         return;
     }
     next();

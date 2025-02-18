@@ -5,8 +5,10 @@
   "description": "An app get track of your specials moments, pictures, and stay close with your partner, even in long distance",
   "main": "index.js",
   "scripts": {
+    "start": "node ./dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "dev": "echo && echo Running test script. && echo && npm run build & npm run start"
   },
   "keywords": [],
   "author": "",
