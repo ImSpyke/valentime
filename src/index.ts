@@ -27,21 +27,26 @@ import * as Types from './types.js'
 const LOCAL_TOKEN = process.env?.TOKEN ?? null
 
 if(LOCAL_TOKEN == null || typeof LOCAL_TOKEN !='string' ) {
-    throw new Error()
+    throw new Error("LOCAL_TOKEN is undefined")
 }
 
 console.log("Loaded token:",LOCAL_TOKEN)
+
+app.use((req,_res,next) => {
+    console.log((`[server] ${req.method.toUpperCase()} ${req.path}`).padEnd(60, " "),`(${req.headers['user-agent']}`)
+    next()
+})
+
 app.use((req, res, next) => {
 
     function noSiteError() {
-        res.status(404).send('Not found');
+        res.status(404).sendFile(path.join(__dirname, '../public', `noAccess.html`));
         return;
     }
-    console.log("Client cookies:",req.query?.cookie)
-    const token = req.cookies?.token ?? null
+    const token = req.cookies?.TOKEN ?? null
     const sanitized_token = (token != null && typeof token === 'string') ? `${token ?? null}` : null
-    console.log("LOCAL token:",LOCAL_TOKEN)
-    console.log("client token:",sanitized_token)
+    //console.log("LOCAL token:",LOCAL_TOKEN)
+    //console.log("client token:",sanitized_token)
     if(sanitized_token == null) { noSiteError(); return; }
     if (SF.isBufferEqual(Buffer.from(<string>process.env.TOKEN), Buffer.from(sanitized_token)) == false) {
         noSiteError()
@@ -148,7 +153,7 @@ app.get("/api/album", async(_req,res) => {
     // Get album metadatas
     let metaDatas: Types.AlbumMetaDatas = { items: [] };
     
-    const metaDataPath = path.join(__dirname, '../public', "./assets/datas/metadata.json");
+    const metaDataPath = path.join(__dirname, '../public', "./assets/datas/album.json");
     if (fs.existsSync(metaDataPath) && fs.statSync(metaDataPath).isFile()) {
         metaDatas = JSON.parse(fs.readFileSync(metaDataPath, 'utf-8'));
     }
@@ -163,13 +168,15 @@ app.get("/api/album", async(_req,res) => {
         }        
 
         const album = files.map(async file => {
+
+            if (file === '.gitkeep') return null;
             const filePath = path.join(albumPath, file);
             const stats = fs.statSync(filePath);
             const ext = path.extname(file).toLowerCase();
             const type = ext === '.mp4' || ext === '.mov' ? 'video' : 'photo';
 
             const metaData = metaDatas.items.find(item => item.storedName === file);
-
+            
             return {
                 type: type,
                 url: `/assets/album/${file}`,
@@ -180,7 +187,7 @@ app.get("/api/album", async(_req,res) => {
             };
         });
 
-        let the_album = await Promise.all(album)
+        let the_album = (await Promise.all(album)).filter(x=> x != null)
 
         res.json(the_album);
     });
@@ -189,8 +196,9 @@ app.get("/api/album", async(_req,res) => {
 app.get('*', (req, res): void => {
 
     if(req.path.startsWith("/assets/")) {
-        if(fs.existsSync(path.join(__dirname, '../public', req.path))) {
-            res.sendFile(path.join(__dirname, '../public', req.path));
+        let the_path = path.join(__dirname, '../public', req.path)
+        if(fs.existsSync(the_path)) {
+            res.sendFile(the_path);
         } else {
             res.status(404).send('Ressource Not found');
         }
